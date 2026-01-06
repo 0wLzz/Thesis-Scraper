@@ -1,12 +1,14 @@
-import time
 import requests
 import pandas as pd
 from tqdm import tqdm
 from bs4.element import Tag
 from bs4 import BeautifulSoup
 
+BASE_URL = "https://graduation.apps.binus.ac.id/edition/wisuda-"
+
 BASE_URL_GRADUATES = "https://graduation.apps.binus.ac.id/edition/wisuda-73/graduates/"
 BASE_URL_OUTSTANDING = "https://graduation.apps.binus.ac.id/edition/wisuda-70/outstanding-graduates/"
+
 params = {
     "SearchGraduate": "",
     "GraduatesDegree": 3, # Strata 1
@@ -32,14 +34,18 @@ def scrape_list_page(page: Tag) -> list:
     results = []
     for li in tqdm(page.select("li.the-student")):
         name = li.select_one("span.student-name").get_text(strip=True)
-        ipk = li.select_one(".gpa-row .col-xs-6 .value").get_text(strip=True)
         program = li.select_one("span.program-name").get_text(strip=True)
         profile_url = li.select_one("a.photo")["href"]
         thesis_title = extract_thesis_title(profile_url)
 
+        try :
+            ipk = li.select_one(".gpa-row .col-xs-6 .value").get_text(strip=True)
+        except :
+            ipk = None
+
         graduate = {
             "Name": name,
-            # "IPK": ipk,
+            "IPK": ipk,
             "Program": program,
             "Thesis Title" : thesis_title
         }
@@ -48,7 +54,7 @@ def scrape_list_page(page: Tag) -> list:
     
     return results
 
-def main():
+def scrape(url: str, filename : str):
     page = 1
     df = pd.DataFrame()
     
@@ -56,7 +62,7 @@ def main():
         print(f"Scraping page {page}..")
 
         params["page"] = page 
-        soup = fetch_soup(BASE_URL_OUTSTANDING, params)
+        soup = fetch_soup(url, params)
 
         graduates_list = soup.find("ul", id="the-graduates")
         if not graduates_list:
@@ -67,8 +73,17 @@ def main():
         df = pd.concat([df, pd.DataFrame(graduates)], ignore_index=True)
         page += 1 
 
-    df.to_csv("70-Graduates.csv", index=False, header=True)
+    df.to_csv(f"{filename}.csv", index=False, header=True)
     print(f"Finishied Scraping in total scrapped data {len(df)}")
 
+def menu():
+    year = input("What year do you want to scrape: ")
+
+    print("Scraping Graduates..")
+    scrape(f"{BASE_URL}{year}/graduates", f"{year}-Graduates")
+
+    print("Scraping Outstanding Graduates..")
+    scrape(f"{BASE_URL}{year}/outstanding-graduates", f"{year}-Outstanding-Graduates")
+
 if __name__ == "__main__":
-    main()
+    menu()
